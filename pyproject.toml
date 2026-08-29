@@ -1,0 +1,39 @@
+[tool.poetry]
+name = "infer_rvc_python"
+version = "1.3.0"
+description = "Python wrapper for fast inference with rvc"
+authors = ["R3gm"]
+readme = "README.md"
+homepage = "https://github.com/R3gm/infer_rvc_python"
+repository = "https://github.com/R3gm/infer_rvc_python"
+license = "MIT"
+include = ["*.txt", "*.rep", "*.pickle"]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+torch = "*"
+torchvision = "*"
+torchaudio = "*"
+faiss-cpu = "1.10.0"
+ffmpeg-python = ">=0.2.0"
+librosa = "*"
+numpy = "*"
+praat-parselmouth = ">=0.4.2"
+pyworld = "0.3.4"
+soundfile = "*"
+torchcrepe = "0.0.20"
+typeguard = "4.2.0"
+transformers = "*"
+soxr = "1.1.0"
+
+# Optional dependencies (extras)
+scipy = { version = "*", optional = true }
+numba = { version = "0.56.4", optional = true }
+edge-tts = { version = "*", optional = true }
+
+[tool.poetry.extras]
+all = ["scipy", "numba", "edge-tts"]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

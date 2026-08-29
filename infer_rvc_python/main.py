@@ -1,11 +1,13 @@
 from infer_rvc_python.lib.log_config import logger
 import torch
+import torch.nn as nn
 import gc
 import numpy as np
 import os
 import warnings
 import threading
 from tqdm import tqdm
+from transformers import HubertConfig, HubertModel
 from infer_rvc_python.lib.infer_pack.models import (
     SynthesizerTrnMs256NSFsid,
     SynthesizerTrnMs256NSFsid_nono,
@@ -105,7 +107,6 @@ class Config:
 
 BASE_DOWNLOAD_LINK = "https://huggingface.co/r3gm/sonitranslate_voice_models/resolve/main/"
 BASE_MODELS = [
-    "hubert_base.pt",
     "rmvpe.pt"
 ]
 BASE_DIR = "."
@@ -181,30 +182,60 @@ def download_manager(
     return filename
 
 
+class HubertModelWithFinalProj(HubertModel):
+    def __init__(self, config):
+        super().__init__(config)
+        self.final_proj = nn.Linear(config.hidden_size, config.classifier_proj_size)
+
+
+class FairseqHubertWrapper(nn.Module):
+    def __init__(self, model_path_or_name="r3gm/hubert_base"):
+        super().__init__()
+        try:
+            self.model = HubertModelWithFinalProj.from_pretrained(model_path_or_name)
+        except Exception:
+            self.model = HubertModel.from_pretrained(model_path_or_name)
+
+    def extract_features(self, source, padding_mask=None, output_layer=12, **kwargs):
+        param_dtype = next(self.model.parameters()).dtype
+        if source.dtype != param_dtype:
+            source = source.to(param_dtype)
+
+        if source.dim() == 1:
+            source = source.unsqueeze(0)
+
+        with torch.no_grad():
+            outputs = self.model(source, output_hidden_states=True)
+
+        # 9 for v1, 12 for v2/ContentVec
+        if output_layer is None or output_layer >= len(outputs.hidden_states):
+            hidden_state = outputs.hidden_states[-1]
+        else:
+            hidden_state = outputs.hidden_states[output_layer]
+
+        return (hidden_state, None)
+
+    def final_proj(self, x):
+        if hasattr(self.model, "final_proj"):
+            return self.model.final_proj(x)
+        return x
+
+
 def load_hu_bert(config, hubert_path=None):
-    from fairseq import checkpoint_utils
+    if hubert_path and (os.path.exists(hubert_path) or os.path.isdir(hubert_path)):
+        target_path = hubert_path
+    else:
+        target_path = "r3gm/hubert_base"
 
-    if hubert_path is None:
-        hubert_path = ""
-    if not os.path.exists(hubert_path):
-        for id_model in BASE_MODELS:
-            download_manager(
-                os.path.join(BASE_DOWNLOAD_LINK, id_model), BASE_DIR
-            )
-        hubert_path = "hubert_base.pt"
-
-    models, _, _ = checkpoint_utils.load_model_ensemble_and_task(
-        [hubert_path],
-        suffix="",
-    )
-    hubert_model = models[0]
+    hubert_model = FairseqHubertWrapper(target_path)
     hubert_model = hubert_model.to(config.device)
-    if config.is_half:
+
+    if config.is_half and torch.device(config.device).type != "cpu":
         hubert_model = hubert_model.half()
     else:
         hubert_model = hubert_model.float()
-    hubert_model.eval()
 
+    hubert_model.eval()
     return hubert_model
 
 
@@ -720,6 +751,10 @@ class BaseLoader:
                         rm_local_path = "rmvpe.pt"
                         if os.path.exists(self.rmvpe_path):
                             rm_local_path = self.rmvpe_path
+                        else:
+                            download_manager(
+                                os.path.join(BASE_DOWNLOAD_LINK, "rmvpe.pt"), BASE_DIR
+                            )
                         self.model_pitch_estimator = RMVPE(
                             rm_local_path,
                             is_half=self.config.is_half,
@@ -894,6 +929,10 @@ class BaseLoader:
                     rm_local_path = "rmvpe.pt"
                     if os.path.exists(self.rmvpe_path):
                         rm_local_path = self.rmvpe_path
+                    else:
+                        download_manager(
+                            os.path.join(BASE_DOWNLOAD_LINK, "rmvpe.pt"), BASE_DIR
+                        )
                     self.model_pitch_estimator = RMVPE(
                         rm_local_path,
                         is_half=self.config.is_half,
