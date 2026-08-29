@@ -1,4 +1,4 @@
-# RVC-Python-FastInference
+# RVC-Python-Fast Inference
 
 A streamlined Python wrapper for fast inference with RVC.
 Specifically designed for inference tasks.
@@ -16,13 +16,12 @@ This streamlined wrapper offers an efficient solution for integrating RVC into y
 
 ### Prerequisites
 
-- You need to have ffmpeg and Python 3.10 installed.
-- In windows is needed to install Microsoft Visual C++ Build Tools, MSVC and Windows 10 SDK:
+- You need to have ffmpeg and Python installed.
 
-    * Go to the [Visual Studio downloads page](https://visualstudio.microsoft.com/visual-cpp-build-tools/); Or maybe you already have **Visual Studio Installer**? Open it. If you have it already click modify.
-    * Download and install the "Build Tools for Visual Studio" if you don't have it.
-    * During installation, under "Workloads", select "C++ build tools" and ensure the latest versions of "MSVCv142 - VS 2019 C++ x64/x86 build tools" and "Windows 10 SDK"  are selected ("Windows 11 SDK" if you are using Windows 11); OR go to individual components and find those two listed.
-    * Complete the installation.
+Pre-requirements:
+```
+pip install pip>=24 setuptools<=80.6.0
+```
 
 ### Installation
 
@@ -39,6 +38,8 @@ from infer_rvc_python import BaseLoader
 
 converter = BaseLoader(only_cpu=False, hubert_path=None, rmvpe_path=None)
 ```
+`hubert_path` now accepts a pretrained model instead of a `.pt` file, with `r3gm/hubert_base` as the default value.
+
 
 ## Define a tag and select the model along with other parameters.
 
