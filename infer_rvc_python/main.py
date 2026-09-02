@@ -289,13 +289,45 @@ def load_trained_model(model_path, config):
 
 
 class BaseLoader:
-    def __init__(self, only_cpu=False, hubert_path=None, rmvpe_path=None):
+    def __init__(self, only_cpu=False, hubert_path=None, rmvpe_path=None, preload_models=False):
         self.model_config = {}
-        self.config = None
         self.cache_model = {}
         self.only_cpu = only_cpu
         self.hubert_path = hubert_path
         self.rmvpe_path = rmvpe_path
+
+        self.config = Config(self.only_cpu)
+        self.hu_bert_model = None
+        self.model_pitch_estimator = None
+        self.model_vc = {}
+
+        if preload_models:
+            logger.info("Pre-loading HuBERT and RMVPE models to device...")
+            self.hu_bert_model = load_hu_bert(self.config, self.hubert_path)
+            self._load_rmvpe()
+
+    def _load_rmvpe(self):
+        """Centralized method to load RMVPE."""
+        if self.model_pitch_estimator is not None:
+            return
+
+        from infer_rvc_python.lib.rmvpe import RMVPE
+        logger.info("Loading vocal pitch estimator model")
+        
+        if self.rmvpe_path is None:
+            self.rmvpe_path = ""
+        rm_local_path = "rmvpe.pt"
+        if os.path.exists(self.rmvpe_path):
+            rm_local_path = self.rmvpe_path
+        else:
+            rm_local_path = download_manager(
+                os.path.join(BASE_DOWNLOAD_LINK, "rmvpe.pt"), BASE_DIR
+            )
+        self.model_pitch_estimator = RMVPE(
+            rm_local_path,
+            is_half=self.config.is_half,
+            device=self.config.device
+        )
 
     def apply_conf(
         self,
@@ -320,11 +352,6 @@ class BaseLoader:
 
         if file_pitch_algo is None:
             file_pitch_algo = ""
-
-        if not self.config:
-            self.config = Config(self.only_cpu)
-            self.hu_bert_model = None
-            self.model_pitch_estimator = None
 
         self.model_config[tag] = {
             "file_model": file_model,
@@ -752,25 +779,7 @@ class BaseLoader:
                         logger.error(f"f0 file: {str(error)}")
 
                 if "rmvpe" in f0_method:
-                    if not self.model_pitch_estimator:
-                        from infer_rvc_python.lib.rmvpe import RMVPE
-
-                        logger.info("Loading vocal pitch estimator model")
-                        if self.rmvpe_path is None:
-                            self.rmvpe_path = ""
-                        rm_local_path = "rmvpe.pt"
-                        if os.path.exists(self.rmvpe_path):
-                            rm_local_path = self.rmvpe_path
-                        else:
-                            download_manager(
-                                os.path.join(BASE_DOWNLOAD_LINK, "rmvpe.pt"), BASE_DIR
-                            )
-                        self.model_pitch_estimator = RMVPE(
-                            rm_local_path,
-                            is_half=self.config.is_half,
-                            device=self.config.device
-                        )
-
+                    self._load_rmvpe()
                     pipe.model_rmvpe = self.model_pitch_estimator
 
                 cache_params = id_tag
@@ -936,25 +945,7 @@ class BaseLoader:
             self.model_vc["inp_f0"] = inp_f0
 
             if "rmvpe" in f0_method:
-                if not self.model_pitch_estimator:
-                    from infer_rvc_python.lib.rmvpe import RMVPE
-
-                    logger.info("Loading vocal pitch estimator model")
-                    if self.rmvpe_path is None:
-                        self.rmvpe_path = ""
-                    rm_local_path = "rmvpe.pt"
-                    if os.path.exists(self.rmvpe_path):
-                        rm_local_path = self.rmvpe_path
-                    else:
-                        download_manager(
-                            os.path.join(BASE_DOWNLOAD_LINK, "rmvpe.pt"), BASE_DIR
-                        )
-                    self.model_pitch_estimator = RMVPE(
-                        rm_local_path,
-                        is_half=self.config.is_half,
-                        device=self.config.device
-                    )
-
+                self._load_rmvpe()
                 self.model_vc["pipe"].model_rmvpe = self.model_pitch_estimator
 
             self.cache_model = copy.deepcopy(now_data)
