@@ -207,11 +207,7 @@ class VC(object):
             feats = model.final_proj(logits[0]) if version == "v1" else logits[0]
         if protect < 0.5 and pitch != None and pitchf != None:
             feats0 = feats.clone()
-        if (
-            isinstance(index, type(None)) == False
-            and isinstance(big_npy, type(None)) == False
-            and index_rate != 0
-        ):
+        if index is not None and index_rate > 0:
             npy = feats[0].cpu().numpy()
             if self.is_half:
                 npy = npy.astype("float32")

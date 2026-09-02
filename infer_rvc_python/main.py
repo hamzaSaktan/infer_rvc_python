@@ -246,6 +246,10 @@ def load_trained_model(model_path, config):
 
     logger.info("Loading %s" % model_path)
     cpt = torch.load(model_path, map_location="cpu")
+    if not isinstance(cpt, dict) or "config" not in cpt:
+        raise ValueError(
+            f"The file '{model_path}' is not a valid RVC model. Missing 'config' dictionary in checkpoint."
+        )
     tgt_sr = cpt["config"][-1]
     cpt["config"][-3] = cpt["weight"]["emb_g.weight"].shape[0]  # n_spk
     if_f0 = cpt.get("f0", 1)
@@ -715,16 +719,22 @@ class BaseLoader:
                 if_f0 = cpt.get("f0", 1)  # pitch data
 
                 # Load index
-                if os.path.exists(file_index) and index_rate != 0:
+                if file_index and os.path.isfile(file_index) and index_rate != 0:
                     try:
                         index = faiss.read_index(file_index)
-                        big_npy = index.reconstruct_n(0, index.ntotal)
+                        if index.ntotal > 0:
+                            big_npy = index.reconstruct_n(0, index.ntotal)
+                        else:
+                            logger.warning(f"Index '{file_index}' has 0 vectors. Disabling index.")
+                            index_rate = 0
+                            index = big_npy = None
                     except Exception as error:
                         logger.error(f"Index: {str(error)}")
                         index_rate = 0
                         index = big_npy = None
                 else:
-                    logger.warning("File index not found")
+                    if file_index and not os.path.isfile(file_index):
+                        logger.warning("File index not found")
                     index_rate = 0
                     index = big_npy = None
 
@@ -887,16 +897,22 @@ class BaseLoader:
             self.model_vc["if_f0"] = self.model_vc["cpt"].get("f0", 1)
 
             # Load index
-            if os.path.exists(file_index) and index_rate != 0:
+            if file_index and os.path.isfile(file_index) and index_rate != 0:
                 try:
                     index = faiss.read_index(file_index)
-                    big_npy = index.reconstruct_n(0, index.ntotal)
+                    if index.ntotal > 0:
+                        big_npy = index.reconstruct_n(0, index.ntotal)
+                    else:
+                        logger.warning(f"Index '{file_index}' has 0 vectors. Disabling index.")
+                        index_rate = 0
+                        index = big_npy = None
                 except Exception as error:
                     logger.error(f"Index: {str(error)}")
                     index_rate = 0
                     index = big_npy = None
             else:
-                logger.warning("File index not found")
+                if file_index and not os.path.isfile(file_index):
+                    logger.warning("File index not found")
                 index_rate = 0
                 index = big_npy = None
 
