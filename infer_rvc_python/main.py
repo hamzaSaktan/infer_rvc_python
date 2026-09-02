@@ -648,6 +648,7 @@ class BaseLoader:
         overwrite=False,
         parallel_workers=1,
         type_output=None,  # ["mp3", "wav", "flac"]
+        show_progress=True,
     ):
         logger.info(f"Parallel workers: {str(parallel_workers)}")
 
@@ -684,7 +685,7 @@ class BaseLoader:
 
         cache_params = None
         threads = []
-        progress_bar = tqdm(total=len(tag_list), desc="Progress")
+        progress_bar = tqdm(total=len(tag_list), desc="Progress", disable=not show_progress)
         for i, (id_tag, input_audio_path) in enumerate(sorted_tag_file):
 
             if id_tag not in self.model_config.keys():
