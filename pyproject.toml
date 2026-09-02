@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "infer_rvc_python"
-version = "1.3.0"
+version = "1.3.1"
 description = "Python wrapper for fast inference with rvc"
 authors = ["R3gm"]
 readme = "README.md"
